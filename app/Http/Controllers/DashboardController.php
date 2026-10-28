@@ -1,42 +1,54 @@
 <?php
 
-use App\Models\kost;
+namespace App\Http\Controllers;
 
-require_once __DIR__ . '/../Models/Kost.php';
+use Illuminate\Http\Request;
+use App\Models\Kost;
+use App\Models\Kamar;
+use App\Models\Booking;
 
-class DashboardController
+class DashboardController extends Controller
 {
     public function tampilkan()
     {
-        if (!isset($_SESSION["id_pengguna"])) {
-            header("Location: index.php?page=login");
-            exit;
+        // Memastikan pengguna sudah login
+        if (!session()->has('id_pengguna')) {
+            return redirect()->route('login');
         }
 
-        $role = $_SESSION["role"] ?? '';                               
+        $role = session('role', '');
 
-        if ($role == "Pencari Kost") {
+        // DASHBOARD PENCARI KOST
+        if ($role === 'Pencari Kost') {
+
+            $nama = session('nama', 'Pencari Kost');
+
+            // Sementara daftar kost kosong jika model belum tersedia
+            $daftarKost = [];
+
+            if (class_exists(Kost::class)) {
+                $kostModel = new Kost();
+                $daftarKost = $kostModel->getAllKost();
+            }
+
+            return view('dashboard_pencari', compact(
+                'nama',
+                'daftarKost'
+            ));
+
+        // DASHBOARD PEMILIK KOST
+        } elseif ($role === 'Pemilik Kost') {
+
+            $id_pengguna = session('id_pengguna');
 
             $kostModel = new Kost();
-            $daftarKost = $kostModel->getAllKost();
-
-            // Memastikan path file view dipanggil secara presisi dari lokasi controller ini
-            require __DIR__ . '/../views/dashboard_pencari.php';
-
-        } elseif ($role == "Pemilik Kost") {
-
-            require_once __DIR__ . '/../models/Kamar.php';
-            require_once __DIR__ . '/../models/Booking.php';
-            require_once __DIR__ . '/../models/Kost.php';
-
-            $id_pengguna = $_SESSION['id_pengguna'] ?? 0;
-
             $kamarModel = new Kamar();
             $bookingModel = new Booking();
-            $kostModel = new Kost();
 
-            // Mengambil data kost khusus pemilik yang sedang login
-            $daftarKost = $kostModel->getKostByPengguna($id_pengguna);
+            // Mengambil data kost milik pengguna yang login
+            $daftarKost = $kostModel->getKostByPengguna(
+                $id_pengguna
+            );
 
             $totalKamar = $kamarModel->countTotalKamar();
             $daftarKamar = $kamarModel->getAllKamar();
@@ -44,16 +56,27 @@ class DashboardController
             $totalBooking = $bookingModel->countBookingProses();
             $daftarBooking = $bookingModel->getBookingTerbaru();
 
-            require __DIR__ . '/../views/dashboard_pemilik.php';
+            $nama = session('nama', 'Pemilik Kost');
 
+            return view('dashboard_pemilik', compact(
+                'nama',
+                'daftarKost',
+                'totalKamar',
+                'daftarKamar',
+                'totalBooking',
+                'daftarBooking'
+            ));
 
-        } elseif ($role == "Admin") {
+        // DASHBOARD ADMIN
+        } elseif ($role === 'Admin') {
 
-            require __DIR__ . '/../views/dashboard_admin.php';
+            $nama = session('nama', 'Admin');
+
+            return view('dashboard_admin', compact('nama'));
 
         } else {
 
-            echo "Role tidak dikenali.";
+            abort(403, 'Role tidak dikenali.');
         }
     }
 }

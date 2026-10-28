@@ -1,326 +1,405 @@
+
 <?php
-$nama = $_SESSION["nama"] ?? "Pengguna";
+use Illuminate\Support\Facades\DB;
+
+// Mengambil nama pengguna dari session Laravel
+$namaSession = session('nama', 'Pengguna');
+
+$nama = htmlspecialchars(
+    $namaSession ?: 'Pengguna',
+    ENT_QUOTES,
+    'UTF-8'
+);
+
+ // Mengambil data kost yang sudah disiapkan oleh route
+$daftarKost = $daftarKost ?? collect();
+
+// Menghitung jumlah kost yang ditampilkan
+$jumlahKost = $daftarKost->count();
+
+
+// Format harga ke rupiah
+if (!function_exists('rupiahDashboard')) {
+    function rupiahDashboard($angka)
+    {
+        return 'Rp' . number_format(
+            (float) $angka,
+            0,
+            ',',
+            '.'
+        );
+    }
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - KostKu</title>
+
+    <title>Dashboard Pencari Kost | KostKu</title>
 
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
             font-family: Arial, sans-serif;
         }
 
         body {
-            background-color: #f7f3ef;
-            color: #222;
-        }
-
-        .container {
-            display: flex;
-            min-height: 100vh;
+            background: #f7f3ef;
+            color: #403126;
         }
 
         /* SIDEBAR */
         .sidebar {
-            width: 220px;
-            background-color: #765238;
+            width: 245px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: #765238;
             color: white;
-            padding: 22px 15px;
+            padding: 30px 20px;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
         }
 
         .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
-            margin-bottom: 30px;
-            padding-left: 5px;
         }
 
-        .logo-icon {
-            font-size: 30px;
-        }
-
-        .menu {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+        .tagline {
+            color: #e7d7c9;
+            font-size: 12px;
+            margin-top: 7px;
+            margin-bottom: 38px;
         }
 
         .menu a {
-            color: white;
-            text-decoration: none;
-            padding: 13px 12px;
-            border-radius: 7px;
             display: flex;
             align-items: center;
-            gap: 13px;
+            gap: 12px;
+            text-decoration: none;
+            color: #f8eee5;
+            padding: 14px;
+            border-radius: 9px;
+            margin-bottom: 8px;
             font-size: 14px;
-            font-weight: bold;
+            transition: background 0.2s;
         }
 
         .menu a:hover,
         .menu a.active {
-            background-color: #d9a17e;
+            background: #9b7656;
         }
 
         .menu-icon {
-            width: 22px;
+            width: 23px;
             text-align: center;
-            font-size: 20px;
+            font-size: 18px;
         }
 
         .logout {
             margin-top: auto;
+            padding-top: 25px;
         }
 
-        .logout a {
-            color: white;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 13px;
-            padding: 13px 12px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        /* CONTENT */
-        .content {
-            flex: 1;
-            padding: 20px 25px;
-        }
-
-        /* HEADER */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        .welcome h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-        }
-
-        .welcome p {
-            color: #888;
-            font-size: 13px;
-            font-weight: bold;
-        }
-
-        .header-icons {
-            display: flex;
-            gap: 20px;
-            font-size: 20px;
-        }
-
-        /* SEARCH */
-        .search-box {
-            margin-top: 25px;
-            position: relative;
-        }
-
-        .search-box input {
+        .logout button {
             width: 100%;
-            height: 42px;
-            border: 1px solid #d4d0cc;
-            border-radius: 8px;
-            padding: 0 45px 0 15px;
-            outline: none;
-            background: white;
+            padding: 13px;
+            background: #5c3c29;
+            border: none;
+            border-radius: 9px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
         }
 
-        .search-box span {
-            position: absolute;
-            right: 15px;
-            top: 11px;
-            color: #888;
-            font-size: 18px;
+        .logout button:hover {
+            background: #4b3021;
         }
 
-        /* SUMMARY */
-        .summary {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 25px;
-            margin-top: 30px;
+        /* KONTEN UTAMA */
+        .main {
+            margin-left: 245px;
+            padding: 35px 40px;
         }
 
-        .summary-card {
-            background-color: white;
-            border: 1px solid #d5d0cc;
-            min-height: 82px;
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .summary-icon {
-            font-size: 28px;
-            color: #765238;
-        }
-
-        .summary-info {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-
-        .summary-title {
-            color: #777;
-            font-size: 11px;
-            font-weight: bold;
-        }
-
-        .summary-number {
-            font-size: 21px;
-            font-weight: bold;
-        }
-
-        .summary-desc {
-            color: #777;
-            font-size: 10px;
-            font-weight: bold;
-        }
-
-        /* REKOMENDASI */
-        .section-header {
+        .topbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 35px;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .topbar h1 {
+            font-size: 27px;
+            margin-bottom: 8px;
+        }
+
+        .muted {
+            color: #8c7b6d;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .user {
+            background: white;
+            border-radius: 10px;
+            padding: 13px 18px;
+            font-size: 14px;
+            white-space: nowrap;
+            box-shadow: 0 3px 14px #00000008;
+        }
+
+        /* SAPAAN */
+        .welcome {
+            background: #e9d9c8;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 30px;
+        }
+
+        .welcome h2 {
+            font-size: 24px;
             margin-bottom: 12px;
         }
 
-        .section-header h2 {
+        .welcome p {
+            color: #725b48;
+            line-height: 1.7;
             font-size: 14px;
         }
 
-        .lihat-semua {
-            color: #777;
-            font-size: 11px;
-            text-decoration: none;
+        /* JUDUL BAGIAN */
+        .section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
         }
 
+        .section-title h2 {
+            font-size: 21px;
+        }
+
+        /* RINGKASAN AKTIVITAS */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 35px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 3px 14px #00000008;
+        }
+
+        .stat-icon {
+            font-size: 25px;
+            margin-bottom: 14px;
+        }
+
+        .stat-card p {
+            color: #8c7b6d;
+            font-size: 13px;
+            margin-bottom: 13px;
+        }
+
+        .stat-card h3 {
+            color: #765238;
+            font-size: 27px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card small {
+            color: #9b8b7e;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        /* REKOMENDASI KOST */
         .kost-list {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
         }
 
         .kost-card {
-            background-color: white;
-            border: 1px solid #d5d0cc;
-            border-radius: 7px;
-            padding: 10px;
-            display: flex;
-            gap: 12px;
-            position: relative;
+            background: white;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 3px 14px #00000008;
+            transition: transform 0.2s;
+        }
+
+        .kost-card:hover {
+            transform: translateY(-3px);
         }
 
         .kost-image {
-            width: 62px;
-            height: 62px;
-            background-color: #ddd;
-            border-radius: 6px;
+            height: 140px;
+            background: #e9d9c8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 52px;
+            overflow: hidden;
+        }
+
+        .kost-image img {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
         }
 
+        .kost-image-placeholder {
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: #e9d9c8;
+    color: #765238;
+    font-size: 14px;
+    text-align: center;
+}
+
         .kost-info {
-            flex: 1;
+            padding: 18px;
         }
 
-        .kost-name {
+        .kost-info h3 {
+            font-size: 17px;
+            margin-bottom: 10px;
+            overflow-wrap: anywhere;
+        }
+
+        .lokasi {
+            color: #8c7b6d;
+            font-size: 13px;
+            margin-bottom: 13px;
+            line-height: 1.5;
+        }
+
+        .tipe {
+            display: inline-block;
+            background: #f3e9df;
+            color: #765238;
+            padding: 5px 9px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin-bottom: 13px;
+        }
+
+        .harga {
+            color: #765238;
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .harga small {
+            color: #8c7b6d;
+            font-size: 12px;
+            font-weight: normal;
+        }
+
+        .detail-button {
+            display: block;
+            padding: 11px;
+            background: #765238;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .detail-button:hover {
+            background: #5c3c29;
+        }
+
+        .lihat-semua {
+            color: #765238;
             font-size: 13px;
             font-weight: bold;
-            margin-bottom: 5px;
+            text-decoration: none;
         }
 
-        .kost-location {
-            color: #777;
-            font-size: 9px;
-            margin-bottom: 7px;
+        .lihat-semua:hover {
+            text-decoration: underline;
         }
 
-        .kost-price {
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 6px;
-        }
-
-        .kost-facilities {
-            color: #777;
-            font-size: 9px;
-        }
-
-        .favorite {
-            position: absolute;
-            right: 10px;
-            top: 8px;
-            color: #777;
-            font-size: 17px;
-        }
-
-        .available {
-            color: #23833b;
-            font-size: 10px;
-            font-weight: bold;
-            margin-top: 8px;
+        .kosong {
+            grid-column: 1 / -1;
+            background: white;
+            padding: 25px;
+            border-radius: 14px;
+            color: #8c7b6d;
+            text-align: center;
         }
 
         /* RESPONSIVE */
-        @media (max-width: 800px) {
-
-            .sidebar {
-                width: 180px;
-            }
-
-            .summary {
-                grid-template-columns: 1fr;
-            }
-
+        @media (max-width: 1050px) {
+            .stats,
             .kost-list {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .main {
+                padding: 25px;
             }
         }
 
-        @media (max-width: 600px) {
-
+        @media (max-width: 700px) {
             .sidebar {
-                width: 65px;
-                padding: 20px 8px;
+                width: 100%;
+                height: auto;
+                position: static;
             }
 
-            .logo {
-                justify-content: center;
+            .tagline {
+                margin-bottom: 20px;
             }
 
-            .logo-text,
-            .menu-text,
-            .logout-text {
-                display: none;
+            .menu {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 5px;
             }
 
-            .menu a,
-            .logout a {
-                justify-content: center;
+            .menu a {
+                margin-bottom: 0;
             }
 
-            .content {
-                padding: 15px;
+            .logout {
+                margin-top: 10px;
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 22px 16px;
+            }
+
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .stats,
+            .kost-list {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -328,174 +407,233 @@ $nama = $_SESSION["nama"] ?? "Pengguna";
 
 <body>
 
-    <div class="container">
+<!-- SIDEBAR -->
+<aside class="sidebar">
 
-        <!-- SIDEBAR -->
-        <aside class="sidebar">
+    <div class="logo">KostKu</div>
+    <div class="tagline">Temukan tempat tinggalmu</div>
 
-            <div class="logo">
-                <span class="logo-icon">⌂</span>
-                <span class="logo-text">KostKu</span>
+    <nav class="menu">
+        <a href="/dashboard/pencari" class="active">
+            <span class="menu-icon">🏠</span>
+            Dashboard
+        </a>
+
+        <a href="/cari-kost">
+            <span class="menu-icon">🔎</span>
+            Cari Kost
+        </a>
+
+        <a href="/riwayat-booking">
+            <span class="menu-icon">📋</span>
+            Riwayat Booking
+        </a>
+
+        <a href="/profil">
+            <span class="menu-icon">👤</span>
+            Profil
+        </a>
+    </nav>
+
+    <form class="logout" action="/logout" method="POST">
+        <?= csrf_field() ?>
+        <button type="submit">🚪 Logout</button>
+    </form>
+
+</aside>
+
+<!-- KONTEN DASHBOARD -->
+<main class="main">
+
+    <!-- HEADER -->
+    <header class="topbar">
+        <div>
+            <h1>Dashboard</h1>
+            <p class="muted">
+                Temukan tempat tinggal yang nyaman untukmu.
+            </p>
+        </div>
+
+        <div class="user">
+            👋 Hai, <strong><?= $nama ?></strong>
+        </div>
+    </header>
+
+    <!-- SAPAAN -->
+    <section class="welcome">
+        <h2>Selamat datang, <?= $nama ?>!</h2>
+
+        <p>
+            Senang melihatmu kembali di KostKu.
+            Jelajahi pilihan kost yang tersedia dan temukan
+            tempat tinggal yang sesuai dengan kebutuhanmu.
+        </p>
+    </section>
+
+    <!-- RINGKASAN AKTIVITAS -->
+    <section>
+        <div class="section-title">
+            <h2>Ringkasan Aktivitas</h2>
+        </div>
+
+        <div class="stats">
+
+            <div class="stat-card">
+                <div class="stat-icon">🏡</div>
+                <p>Kost Tersedia</p>
+                <h3><?= $jumlahKost ?></h3>
+                <small>
+                    Total kost yang terdaftar di database
+                </small>
             </div>
 
-            <nav class="menu">
-
-                <a href="index.php?page=dashboard" class="active">
-                    <span class="menu-icon">⌂</span>
-                    <span class="menu-text">Dashboard</span>
-                </a>
-
-                <a href="index.php?page=cari_kost">
-                    <span class="menu-icon">⌕</span>
-                    <span class="menu-text">Cari Kost</span>
-                </a>
-
-                <a href="index.php?page=riwayat">
-                    <span class="menu-icon">◷</span>
-                    <span class="menu-text">Riwayat Booking</span>
-                </a>
-
-                <a href="index.php?page=profil">
-                    <span class="menu-icon">♙</span>
-                    <span class="menu-text">Profil</span>
-                </a>
-
-            </nav>
-
-            <div class="logout">
-                <a href="index.php?page=logout">
-                    <span class="menu-icon">↪</span>
-                    <span class="logout-text">Logout</span>
-                </a>
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <p>Booking Saya</p>
+                <h3>0</h3>
+                <small>
+                    Total booking yang telah dilakukan
+                </small>
             </div>
 
-        </aside>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <p>Booking Aktif</p>
+                <h3>0</h3>
+                <small>
+                    Booking yang sedang diproses
+                </small>
+            </div>
 
+        </div>
+    </section>
 
-        <!-- CONTENT -->
-        <main class="content">
+    <!-- REKOMENDASI KOST -->
+    <section>
+        <div class="section-title">
+            <h2>Rekomendasi Kost</h2>
 
-            <!-- HEADER -->
-            <div class="header">
+            <a href="/cari-kost" class="lihat-semua">
+                Cari Kost →
+            </a>
+        </div>
 
-                <div class="welcome">
-                    <h1>Halo, <?= htmlspecialchars($nama) ?>!</h1>
-                    <p>Temukan kost terbaik sesuai kebutuhanmu</p>
+        <div class="kost-list">
+
+            <?php if ($daftarKost->isEmpty()): ?>
+
+                <div class="kosong">
+                    Belum ada data kost yang terdaftar.
                 </div>
 
-                <div class="header-icons">
-                    <span>♧</span>
-                    <span>♙</span>
-                </div>
+            <?php else: ?>
 
-            </div>
+                <?php foreach ($daftarKost as $kost): ?>
 
+                    <?php
+                    // Mengambil kamar untuk kost ini
+                     $daftarKamar = $kost->daftar_kamar
+                    ?? collect();
 
-            <!-- SEARCH -->
-            <div class="search-box">
+                    $kamarTermurah = $daftarKamar->first();
+                    ?>
 
-                <input type="text" placeholder="Cari kost, lokasi, atau fasilitas...">
+                    <article class="kost-card">
 
-                <span>⌕</span>
+                        
+<div class="kost-image">
+    <?php
+    $fotoKostDashboard = trim((string) ($kost->foto_kost ?? ''));
 
-            </div>
+    if ($fotoKostDashboard !== '') {
+        if (
+            str_starts_with($fotoKostDashboard, 'http://') ||
+            str_starts_with($fotoKostDashboard, 'https://')
+        ) {
+            $urlFotoDashboard = $fotoKostDashboard;
+        } else {
+            $pathFotoDashboard = ltrim($fotoKostDashboard, '/');
 
+            // Jika database berisi uploads/ys_kost.PNG
+            $urlFotoDashboard = asset($pathFotoDashboard);
+        }
+    } else {
+        $urlFotoDashboard = asset('uploads/ys_kost.PNG');
+    }
+    ?>
 
-            <!-- SUMMARY -->
-            <div class="summary">
+    <img
+        src="<?= htmlspecialchars($urlFotoDashboard, ENT_QUOTES, 'UTF-8') ?>"
+        alt="Foto <?= htmlspecialchars($kost->nama_kost ?? 'Kost', ENT_QUOTES, 'UTF-8') ?>"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+    >
 
-                <div class="summary-card">
-
-                    <div class="summary-icon">⌂</div>
-
-                    <div class="summary-info">
-                        <span class="summary-title">Booking Aktif</span>
-                        <span class="summary-number">0</span>
-                        <span class="summary-desc">Dalam proses</span>
-                    </div>
-
-                </div>
-
-
-                <div class="summary-card">
-
-                    <div class="summary-icon">◷</div>
-
-                    <div class="summary-info">
-                        <span class="summary-title">Riwayat Booking</span>
-                        <span class="summary-number">0</span>
-                        <span class="summary-desc">Pernah melakukan booking</span>
-                    </div>
-
-                </div>
-
-
-                <div class="summary-card">
-
-                    <div class="summary-icon">♙</div>
-
-                    <div class="summary-info">
-                        <span class="summary-title">Profil</span>
-                        <span class="summary-desc">Lengkapi profilmu</span>
-                    </div>
-
-                </div>
-
-            </div>
-
-<!-- REKOMENDASI -->
-            <div class="section-header">
-                <h2>Rekomendasi Kost</h2>
-                <a href="index.php?page=cari_kost" class="lihat-semua">
-                    Lihat semua →
-                </a>
-            </div>
-
-            <div class="kost-list">
-                <?php if (!empty($daftarKost) && is_array($daftarKost)): ?>
-                    <?php foreach ($daftarKost as $kost): ?>
-                        <div class="kost-card">
-                            <div class="kost-image">
-                                <?php if (!empty($kost['foto_kost'])): ?>
-                                    <img src="<?= htmlspecialchars($kost['foto_kost']) ?>"
-                                         alt="<?= htmlspecialchars($kost['nama_kost']) ?>"
-                                         style="width:100%; height:100%; object-fit:cover; border-radius:6px;">
-                                <?php else: ?>
-                                    <div style="width:100%; height:100%; background:#ddd; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#777;">No Foto</div>
-                                <?php endif; ?>
-                            </div>
-
-                            <div class="kost-info">
-                                <div class="kost-name">
-                                    <?= htmlspecialchars($kost['nama_kost'] ?? 'Nama Kost') ?>
-                                </div>
-
-                                <div class="kost-location">
-                                    ◉ <?= htmlspecialchars($kost['alamat'] ?? '-') ?>
-                                </div>
-
-                                <div class="kost-facilities">
-                                    ♧ <?= htmlspecialchars($kost['fasilitas'] ?? '-') ?>
-                                </div>
-
-                                <div class="available">
-                                    <?= htmlspecialchars($kost['kamar_tersedia'] ?? 'Tersedia') ?>
-                                </div>
-                            </div>
-
-                            <div class="favorite">♡</div>
-                        </div>
-                    <?php endforeach; ?>
-
-                <?php else: ?>
-                    <p>Tidak ada kost yang tersedia.</p>
-                <?php endif; ?>
-            </div>
-
-        </main>
-
+    <div class="kost-image-placeholder" style="display:none;">
+        🏡 Foto kost belum tersedia
     </div>
+</div>
+
+
+                        <div class="kost-info">
+
+                            <h3>
+                                <?= htmlspecialchars(
+                                    $kost->nama_kost ?? '',
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                            </h3>
+
+                            <p class="lokasi">
+                                📍
+                                <?= htmlspecialchars(
+                                    $kost->alamat ?? '',
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                            </p>
+
+                            <span class="tipe">
+                                <?= $daftarKamar->count() ?>
+                                kamar terdaftar
+                            </span>
+
+                            <p class="harga">
+                                <?php if ($kamarTermurah): ?>
+
+                                    <?= rupiahDashboard(
+                                        $kamarTermurah->harga
+                                    ) ?>
+
+                                    <small>/ bulan</small>
+
+                                <?php else: ?>
+
+                                    <small>
+                                        Harga kamar belum tersedia
+                                    </small>
+
+                                <?php endif; ?>
+                            </p>
+
+                            <a
+                                href="/kost/<?= (int) $kost->id_kost ?>/tipe-kamar"
+                                class="detail-button"
+                            >
+                                Lihat Pilihan Tipe Kamar
+                            </a>
+
+                        </div>
+                    </article>
+
+                <?php endforeach; ?>
+
+            <?php endif; ?>
+
+        </div>
+    </section>
+
+</main>
 
 </body>
-
 </html>
